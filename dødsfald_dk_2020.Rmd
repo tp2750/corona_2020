@@ -1,0 +1,89 @@
+---
+title: "Dødfald i Danmark 2020"
+author: "Thomas Poulsen"
+date: "January 1, 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+CVpct <- function(x) 100*sd(x,na.rm=TRUE)/mean(x, na.rm=TRUE)
+
+tb2.in <- read_excel("dødsfald_dk_2020-12-31_edit.xlsx", skip=2)
+tb2 <- tidyr::pivot_longer(tb2.in, matches("\\d+U\\d+"), names_to = "week_id", values_to = "count") %>%
+    mutate(year = as.numeric(sub("(\\d+)U(\\d+)$", "\\1", week_id)),
+           week = as.numeric(sub("(\\d+)U(\\d+)$", "\\2", week_id)),
+           age = ordered(Age, levels= unique(Age))
+           )
+
+tb2_mean <- tb2 %>% group_by(Region, Gender, Age, age , week) %>% summarise(week_mean = mean(count))
+
+```
+
+# Der dør ca 1000 om ugen i Danmark
+
+Det gennemsnitlige antal dødsfald i Danmark per uge fra 2007 til 2020 er 1027 +/- 8%.
+Der dør færrest i sommerhalvåret.
+
+Som i de følgende plot er gennemsnit over 2007 til 2020 markeret med blå prik og 2020 værdien med sort streg.
+Der er ikke nogen voldsom overdødelighed i 2020.
+
+```{r echo=FALSE}
+tb2 %>% subset(Gender == "I alt"& Age == "I alt") %>% summarise(mean_count = mean(count), CVpct = CVpct(count))
+
+ggplot(subset(tb2_mean, Gender =="I alt" & Age == "I alt"), aes(x = week, y = week_mean)) + geom_point(color = "blue") + geom_line(data = subset(tb2, year == 2020 & Gender =="I alt" & Age == "I alt"), aes(x = week, y = count), color = "black") + facet_wrap(~age)+ ggtitle("Døde i DK per uge")
+
+```
+
+# Der dør flest 80-90 årige
+
+Dødstallet topper for 80-90 årige. Det er også for de ældre, at årstidsvariationen er stærk.
+
+Gennemsnit er blå prik, 2020 er sort streg. 
+Der er ikke nogen tydelig overdødelighed i 2020.
+
+```{r echo=FALSE, fig.height=10, fig.width=10}
+ggplot(subset(tb2_mean, Gender =="I alt" & Age != "I alt"), aes(x = week, y = week_mean)) + geom_point(color = "blue") + geom_line(data = subset(tb2, year == 2020 & Gender =="I alt" & Age != "I alt"), aes(x = week, y = count), color = "black") + facet_wrap(~age)+ ggtitle("Døde i DK per uge")
+
+```
+
+# I 2020 døde færre midaldrende og flere ældre
+
+Op til 35 år er der ikke noget ved 2020 der stikker ud.
+Fra 35 - 70 år er der færre døde i 2020 end forventet.
+Over 70 år er der en overdødelighed efter ca uge 10 (nedlukningen kom i uge 11, 2020).
+
+Bemærk at hvert plot har egen y-akse nedenfor.
+Blå prik er gennemsnit over 2007 til 2020. Sort streg er 2020 værdien.
+
+```{r echo=FALSE, fig.height=10, fig.width=10}
+ggplot(subset(tb2_mean, Gender =="I alt" & Age != "I alt"), aes(x = week, y = week_mean)) + geom_point(color = "blue") + geom_line(data = subset(tb2, year == 2020 & Gender =="I alt" & Age != "I alt"), aes(x = week, y = count), color = "black") + facet_wrap(~age, scale="free")+ ggtitle("Døde i DK per uge")
+
+```
+
+## Kønsfordeling
+
+Mænds overdødelighed starter lidt før 20 års alderen og fortsætter frem til 80-85 år, hvor der dør lige mange mænd og kvinder.
+Det er også den aldersgruppe, hvor flest mænd dør (relativt til andre aldersgrupper).
+Kvinder dør typisk som 85-90 årige og derefter dør flere kvinder end mænd.
+
+
+```{r echo=FALSE, fig.height=10, fig.width=10}
+ggplot(subset(tb2_mean, Gender !="I alt" & Age != "I alt"), aes(x = week, y = week_mean, color = Gender)) + geom_point() + geom_line(data = subset(tb2, year == 2020 & Gender !="I alt" & Age != "I alt"), aes(x = week, y = count), color = "black") + facet_wrap(~age)+ ggtitle("Døde i DK per uge")
+
+ggplot(subset(tb2_mean, Gender !="I alt" & Age != "I alt"), aes(x = week, y = week_mean, color = Gender)) + geom_point() + geom_line(data = subset(tb2, year == 2020 & Gender !="I alt" & Age != "I alt"), aes(x = week, y = count), color = "black") + facet_wrap(~age, scale = "free")+ ggtitle("Døde i DK per uge")
+
+```
+
+# Data
+
+Antal døde i Danmark opgrjort per uge, køn og aldergruppe fra 2007 til 2020.
+Hentet fra Danmarks Statistik 2020-12-31:  https://www.statistikbanken.dk/statbank5a/SelectVarVal/Define.asp?MainTable=DODC2&PLanguage=0&PXSId=0&wsid=cftree
+
+Data kan også hentes splittet på region og i en opløsning på en dag.
