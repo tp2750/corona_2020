@@ -1,0 +1,146 @@
+---
+title: "Mortality in Denmark 2020"
+author: "Thomas Poulsen"
+date: "2021-01-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+#library(ggerr)
+library(knitr)
+
+CVpct <- function(x) 100*sd(x,na.rm=TRUE)/mean(x, na.rm=TRUE)
+assert_rows <- function(n,x) {
+  if(nrow(x) != n)
+    stop(sprintf("Expected %s rows, got %s",n,nrow(x)))
+  x
+}
+
+tb2.in <- read_excel("dødsfald_dk_2020-12-31_edit.xlsx", skip=2)
+tb2 <- tidyr::pivot_longer(tb2.in, matches("\\d+U\\d+"), names_to = "week_id", values_to = "count") %>%
+    mutate(year = as.numeric(sub("(\\d+)U(\\d+)$", "\\1", week_id)),
+           week = as.numeric(sub("(\\d+)U(\\d+)$", "\\2", week_id)),
+           age = ordered(Age, levels= unique(Age)),
+           quarter = ceiling(week/13)
+           )
+
+tb2_mean <- tb2 %>% group_by(Region, Gender, Age, age , week) %>% summarise(week_mean = mean(count))
+
+# population for normalization
+#  https://www.statistikbanken.dk/statbank5a/selectvarval/define.asp?PLanguage=0&subword=tabsel&MainTable=FOLK1A&PXSId=199113&tablestyle=&ST=SD&buttons=0
+pop.in <- read_excel("befolkning_2008-2020_edit.xlsx", skip=2)
+pop1 <- tidyr::pivot_longer(pop.in[,-c(1,2)], matches("\\d+K\\d+"), names_to = "quarter_id", values_to="population") %>%
+  mutate(year = as.numeric(sub("(\\d+)K(\\d+)$", "\\1", quarter_id)),
+         quarter = as.numeric(sub("(\\d+)K(\\d+)$", "\\2", quarter_id))) 
+
+tb3 <- merge(tb2, pop1, by=c("Gender","year","quarter")) %>%
+  mutate(mortality_rate = count/population, mortality_per_mio = mortality_rate * 1E6)
+
+tb3_mean <- tb3 %>% group_by(Region, Gender, Age, age , week) %>% summarise(week_mean = mean(mortality_per_mio))
+
+```
+
+# Conclusion
+
+Despite the Covid-19 pandemic, total mortality in Denmark in 2020 is not different from the average over 2008-2020.
+But this hides that mortality for people aged 40-70 was lower than normal, and mortality for ages above 70 was higher.
+
+# Average mortality in Denmark is 181 per million per week.
+
+The average mortality in Denmark in the period 2008-2020 is 181 (+/- 9%) per week per 1 million people.
+It is about half a percent lower for females and half a percent higher for males.
+
+Some legends are in Danish. The translation is:
+
+* "I alt": Total
+* "Mænd": Male
+* "Kvinder": Female
+* "år": years
+
+```{r echo=FALSE}
+tbl1 <- tb3 %>% subset(Age == "I alt") %>% group_by(Gender) %>% summarise(mortality_per_mio = mean(mortality_rate*1E6), CVpct = CVpct(mortality_rate)) %>% ungroup()
+
+kable(tbl1)
+
+kable(subset(tb3, Age == "I alt") %>% group_by(Gender) %>% summarise(population = mean(population)) %>% ungroup())
+
+```
+
+
+The plot below shows the weekly mortality over the span 2008 to 2020 as blue dots, and the 2020 value as a black line. 
+This convention is used in most plots below.
+
+There is no sign of a higher mortality in 2020.
+
+```{r echo=FALSE}
+ggplot(subset(tb3, Gender =="I alt" & Age == "I alt"), aes(x = week, y = mortality_per_mio)) + geom_point(color = "blue", alpha =.5) + geom_line(data = subset(tb3, year == 2020 & Gender =="I alt" & Age == "I alt"), aes(x = week, y = mortality_per_mio), color = "black") +  ggtitle("Mortality in Denmark per week 2008-2020")
+
+```
+
+# Most die at age 80-90
+
+Mortality is highest for the age groups 80-85 and 85-89.
+
+Average over 2008-2020 is a blue dot, 2020 value is a black line. 
+There is no clear over mortality in 2020.
+
+
+```{r echo=FALSE, fig.height=10, fig.width=10}
+ggplot(subset(tb3_mean, Gender =="I alt" & Age != "I alt"), aes(x = week, y = week_mean)) + geom_point(color = "blue") + geom_line(data = subset(tb3, year == 2020 & Gender =="I alt" & Age != "I alt"), aes(x = week, y = mortality_per_mio), color = "black") + facet_wrap(~age)+ ggtitle("Mortality per mio in DK per week")
+
+```
+
+# In 2020 mortility was low for middle aged, and high for elderly.
+
+The plot below splits the data age group. Note that each panel has a separate y-axes.
+
+This shows some interesting effects.
+
+Below 40 it looks most ĺy normal, except for 20-24 years that had da hefty summer.
+
+From 40 to 70 years old mortality is lower than average, except for week 17 (age 45-49) and week 19 (age 50-54).
+
+For ages from 70 to 99 there is a higher mortality in 2020, especially in the weeks between 10 and 20.
+The lockdown in Denmark started week 11.
+
+
+```{r echo=FALSE, fig.height=10, fig.width=10}
+ggplot(subset(tb3_mean, Gender =="I alt" & Age != "I alt"), aes(x = week, y = week_mean)) + geom_point(color = "blue") + geom_line(data = subset(tb3, year == 2020 & Gender =="I alt" & Age != "I alt"), aes(x = week, y = mortality_per_mio), color = "black") + facet_wrap(~age, scale="free")+ ggtitle("Mortality per mio per week in DK")
+
+```
+
+## Gender effect
+
+In general, male over-mortality starts early and is clear until age 80-85 years.
+This is also the age group with highest male mortality. 
+Women typically die at are 85-90.
+
+Looking closer at the plots below, it looks like males are mainly driving the differnce of 2020 to the average.
+
+In the plot below the line is 2020 value and the points are average 2008-2020. The color on both points and lines follow the gender.
+
+```{r echo=FALSE, fig.height=10, fig.width=10}
+
+ggplot(subset(tb3_mean, Gender !="I alt" & Age != "I alt"), aes(x = week, y = week_mean, color = Gender)) + geom_point() + geom_line(data = subset(tb3, year == 2020 & Gender !="I alt" & Age != "I alt"), aes(x = week, y = mortality_per_mio, color = Gender)) + facet_wrap(~age, scales = "free")+ ggtitle("Mortality per mio per week in DK")
+
+ggplot(subset(tb3_mean, Gender =="Mænd" & Age != "I alt"), aes(x = week, y = week_mean)) + geom_point() + geom_line(data = subset(tb3, year == 2020 & Gender =="Mænd" & Age != "I alt"), aes(x = week, y = mortality_per_mio)) + facet_wrap(~age, scales = "free")+ ggtitle("Male Mortality per mio per week in DK")
+
+ggplot(subset(tb3_mean, Gender == "Kvinder" & Age != "I alt"), aes(x = week, y = week_mean)) + geom_point() + geom_line(data = subset(tb3, year == 2020 & Gender =="Kvinder" & Age != "I alt"), aes(x = week, y = mortality_per_mio)) + facet_wrap(~age, scales = "free")+ ggtitle("Female Mortality per mio per week in DK")
+
+
+```
+
+# Data
+
+Mortality numbers per week, age and gender 2007-2020 downloaded from 
+Danmarks Statistik on 2020-12-31:  https://www.statistikbanken.dk/statbank5a/SelectVarVal/Define.asp?MainTable=DODC2&PLanguage=0&PXSId=0&wsid=cftree
+
+Data is also available split on region and at a resolution of 1 day.
+
+Population data for normalization per quarter from 2008 to 2020 was downloaded 2020-01-02 from  https://www.statistikbanken.dk/statbank5a/selectvarval/define.asp?PLanguage=0&subword=tabsel&MainTable=FOLK1A&PXSId=199113&tablestyle=&ST=SD&buttons=0
