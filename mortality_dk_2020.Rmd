@@ -51,6 +51,8 @@ tb3_mean <- tb3 %>% group_by(Region, Gender, Age, age , week) %>% summarise(week
 Despite the Covid-19 pandemic, total mortality in Denmark in 2020 is not different from the average over 2008-2020.
 But this hides that mortality for people aged 40-70 was lower than normal, and mortality for ages above 70 was higher.
 
+This analysis is inspired by a piece by Sonja Furu in [Weekendavisen 2020-53](https://www.weekendavisen.dk/2020-53/samfund/lys-i-moerket).
+
 # Average mortality in Denmark is 181 per million per week.
 
 The average mortality in Denmark in the period 2008-2020 is 181 (+/- 9%) per week per 1 million people.
@@ -64,11 +66,11 @@ Some legends are in Danish. The translation is:
 * "år": years
 
 ```{r echo=FALSE}
-tbl1 <- tb3 %>% subset(Age == "I alt") %>% group_by(Gender) %>% summarise(mortality_per_mio = mean(mortality_rate*1E6), CVpct = CVpct(mortality_rate)) %>% ungroup()
+tbl1 <- tb3 %>% subset(Age == "I alt") %>% group_by(Gender) %>% summarise(mortality_per_mio = mean(mortality_rate*1E6), CVpct = CVpct(mortality_rate), .groups="drop") %>% ungroup()
 
 kable(tbl1)
 
-kable(subset(tb3, Age == "I alt") %>% group_by(Gender) %>% summarise(population = mean(population)) %>% ungroup())
+kable(subset(tb3, Age == "I alt") %>% group_by(Gender) %>% summarise(population = mean(population), .groups="drop") %>% ungroup())
 
 ```
 
