@@ -1,3 +1,4 @@
+## befolkning: https://www.statistikbanken.dk/statbank5a/selectvarval/define.asp?PLanguage=0&subword=tabsel&MainTable=FOLK1A&PXSId=199113&tablestyle=&ST=SD&buttons=0
 library(readxl)
 library(dplyr)
 library(tidyr)
